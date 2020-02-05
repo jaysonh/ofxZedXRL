@@ -41,8 +41,14 @@ public:
 
 	ofMesh * getPointMesh();
 	ofMesh * getPointMeshRGB();
+	ofMesh * getPointMeshRGBIdentify(vector <ofRectangle> rectList);
 	ofMesh * getSpatialMesh();
 	ofMesh * getDetPlane();
+
+	ofPixels getImageColor();
+	ofPixels getImageCalibRGB();
+
+	ofVec3f getTranslatedPos(int x, int y);
 
 private:
 	const float zScale = 100.0;
@@ -60,6 +66,8 @@ private:
 	sl::Camera zed;
 	int zedWidth, zedHeight;
 
+	sl::Mat matDepthMesRGB;
+	sl::Mat matDepthMes;
 	cv::Mat cvMatLeft;
 	cv::Mat cvMatRight;
 	cv::Mat cvMatDepth;
@@ -68,6 +76,8 @@ private:
 	cv::Mat cvPointCloud;
 
 
+	bool invX = true;
+	bool invY = true;
 	vector<ofVec3f> pointCloudVerts;
 	
 	ofVec3f trackedPos;

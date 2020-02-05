@@ -10,7 +10,7 @@ void ofxZedXRL::setup( bool _usePosTrack, bool _usePlaneDet, bool _useSpatialMap
 {
 	InitParameters init_params;
 	init_params.camera_resolution = RESOLUTION::HD720;
-	init_params.depth_mode		  = DEPTH_MODE::PERFORMANCE;
+	init_params.depth_mode		  = DEPTH_MODE::QUALITY; // PERFORMANCE QUALITY 
 	init_params.coordinate_units  = UNIT::METER;
 	init_params.coordinate_system = COORDINATE_SYSTEM::RIGHT_HANDED_Y_UP; 
 	
@@ -57,28 +57,28 @@ void ofxZedXRL::update()
 {
 	RuntimeParameters runtime_parameters;
 	runtime_parameters.sensing_mode = SENSING_MODE::STANDARD; // Use STANDARD sensing mode
-
+	runtime_parameters.measure3D_reference_frame = REFERENCE_FRAME::WORLD;
+	
 	if (zed.grab(runtime_parameters) == ERROR_CODE::SUCCESS)
 	{
 
 		sl::Mat matLeft;
 		sl::Mat matRight;
 		sl::Mat matDepth;
-		sl::Mat pointCloud;
 
 		zed.retrieveImage(   matLeft,     VIEW::LEFT   );
 		zed.retrieveImage(   matRight,    VIEW::RIGHT  );
 		zed.retrieveImage(   matDepth,    VIEW::DEPTH);
-		zed.retrieveMeasure( pointCloud,  MEASURE::XYZRGBA);
+		zed.retrieveMeasure(matDepthMesRGB, MEASURE::XYZRGBA);
+		zed.retrieveMeasure(matDepthMes, MEASURE::XYZ);
 		cvMatLeft     = slMat2cvMat( matLeft     );
 		cvMatRight    = slMat2cvMat( matRight    );
 		cvMatDepth    = slMat2cvMat( matDepth    );
-		cvMatCloud    = slMat2cvMat( pointCloud  );
 									 
-		cv::cvtColor(cvMatLeft,  cvMatLeft,  cv::COLOR_BGR2RGB);
+		cv::cvtColor(cvMatLeft,  cvMatLeft,  cv::COLOR_BGR2RGB); // need to shift color to rgb
 		cv::cvtColor(cvMatRight, cvMatRight, cv::COLOR_BGR2RGB);		
 
-		/*if (useSpatialMap)
+		if(useSpatialMap)
 		{
 			sl::SPATIAL_MAPPING_STATE mapping_state = zed.getSpatialMappingState();
 
@@ -89,15 +89,13 @@ void ofxZedXRL::update()
 			
 			spatialMesh.clear();
 			spatialMesh.setMode(OF_PRIMITIVE_POINTS);
-			//cout << "num vertices: " <<  mesh.vertices.size() << endl;
-			if(mesh.vertices.size() < 10000)
+						
+			for (auto v : mesh.vertices)
 			{
-				for (auto v : mesh.vertices)
-				{
-					spatialMesh.addVertex(ofVec3f(v.x *100.0, v.y*100.0, v.z*100.0));
-				}
+				spatialMesh.addVertex(ofVec3f(v.x * zScale, v.y*zScale, v.z*zScale));
 			}
-		}*/
+			
+		}
 		if (usePosTrack)
 		{
 			sl::Pose zed_pose;
@@ -112,30 +110,30 @@ void ofxZedXRL::update()
 			Plane plane;
 			Pose pose; // positional tracking data
 			ERROR_CODE find_plane_status = ERROR_CODE::SUCCESS;
-			POSITIONAL_TRACKING_STATE tracking_state = POSITIONAL_TRACKING_STATE::OFF;
-
-			sl::RuntimeParameters runtime_parameters;
-			runtime_parameters.measure3D_reference_frame = REFERENCE_FRAME::WORLD;
-
-			tracking_state = zed.getPosition(pose);
 						
-			if (tracking_state == POSITIONAL_TRACKING_STATE::OK)
-			{
-				find_plane_status = zed.findPlaneAtHit(sl::uint2(640,480), plane);
-				if (find_plane_status == ERROR_CODE::SUCCESS) {
-					sl::Mesh mesh = plane.extractMesh();
+			if (zed.getPosition(pose) == POSITIONAL_TRACKING_STATE::OK)
+			{ 
+				sl::uint2 coord = sl::uint2( ofMap(ofGetMouseX(), 0, ofGetWidth(), 0, 1280, true),
+											 ofMap(ofGetMouseY(), 0, ofGetHeight(), 0, 720, true));
 
+				 
+				find_plane_status = zed.findPlaneAtHit(coord, plane);
+				
+				if (find_plane_status == ERROR_CODE::SUCCESS) 
+				{
+					sl::Mesh mesh = plane.extractMesh();
 					mesh.filter(sl::MeshFilterParameters::MESH_FILTER::LOW);
-					cout << mesh.vertices.size() << endl;
-					if (mesh.vertices.size() < 1000000000)
+					
+					detPlaneMesh.clear();
+					detPlaneMesh.setMode(OF_PRIMITIVE_POINTS);
+					vector <sl::float3> boundVerts = plane.getBounds();
+
+					for (auto v : boundVerts)
 					{
-						detPlaneMesh.clear();
-						detPlaneMesh.setMode(OF_PRIMITIVE_POINTS);
-						for (auto v : mesh.vertices)
-						{
-							detPlaneMesh.addVertex(ofVec3f(v.x *zScale, v.y*zScale, v.z*zScale));
-							detPlaneMesh.addColor(ofColor::green);
-						}
+						ofVec3f p = ofVec3f(v.x *zScale, v.y*zScale, v.z*zScale);
+
+						detPlaneMesh.addVertex(p);
+						detPlaneMesh.addColor(ofColor(0,255,0,125));
 					}
 				}
 			}
@@ -145,14 +143,11 @@ void ofxZedXRL::update()
 
 ofMesh * ofxZedXRL::getPointMeshRGB()
 {
-	sl::Mat matDepthMes;
-	zed.retrieveMeasure(matDepthMes, MEASURE::XYZRGBA);
-
 	// make point cloud
-	int w = matDepthMes.getWidth();
-	int h = matDepthMes.getHeight();
+	int w = matDepthMesRGB.getWidth();
+	int h = matDepthMesRGB.getHeight();
 
-	float *data = (float*)(matDepthMes.getPtr<float>(MEM::CPU));
+	float *data = (float*)(matDepthMesRGB.getPtr<float>(MEM::CPU));
 
 	int step = 4;
 	pointCloudVerts.resize(w*h);
@@ -160,8 +155,47 @@ ofMesh * ofxZedXRL::getPointMeshRGB()
 	pointMesh.clear();
 	pointMesh.setMode(OF_PRIMITIVE_POINTS);
 
-	bool invX = true;
-	bool invY = true;
+
+	int numChannels = 4;
+	for (int y = 0; y < h; y += step)
+	{
+		for (int x = 0; x < w; x += step)
+		{
+			int indx = x * numChannels + y * w*numChannels;
+
+			ofVec3f p(data[indx + 0] * zScale,
+				data[indx + 1] * zScale,
+				data[indx + 2] * zScale);
+
+			// decompose 4th float to rgb values
+			float col = data[indx + 3];
+			unsigned char color[sizeof(float)];
+			memcpy(color, &col, sizeof(float));
+			ofColor c((int)color[0], (int)color[1], (int)color[2]);
+
+			//if (invX) p.x = -p.x;
+			//if (invY) p.y = -p.y;
+
+			pointMesh.addVertex(p);
+			pointMesh.addColor(c);
+		}
+	}
+	return &pointMesh;
+}
+ofMesh * ofxZedXRL::getPointMeshRGBIdentify(vector <ofRectangle> rectList)
+{
+	// make point cloud
+	int w = matDepthMesRGB.getWidth();
+	int h = matDepthMesRGB.getHeight();
+	
+	float *data = (float*)(matDepthMesRGB.getPtr<float>(MEM::CPU));
+
+	int step = 4;
+	pointCloudVerts.resize(w*h);
+
+	pointMesh.clear();
+	pointMesh.setMode(OF_PRIMITIVE_POINTS);
+
 
 	int numChannels = 4;
 	for (int y = 0; y < h; y += step)
@@ -180,10 +214,19 @@ ofMesh * ofxZedXRL::getPointMeshRGB()
 			memcpy(color, &col, sizeof(float));
 			ofColor c((int)color[0], (int)color[1], (int)color[2]);
 
-			if (invX) p.x = -p.x;
-			if (invY) p.y = -p.y;
+			//if (invX) p.x = -p.x;
+			//if (invY) p.y = -p.y;
 
 			pointMesh.addVertex( p );
+			
+			// check if point is within one of the bounding rectangles
+			for (auto r : rectList)
+			{
+				if (r.inside(x, y))
+				{
+					c = ofColor(255, 0, 255);
+				}
+			}
 			pointMesh.addColor(  c );
 		}
 	}
@@ -191,13 +234,11 @@ ofMesh * ofxZedXRL::getPointMeshRGB()
 }
 ofMesh * ofxZedXRL::getPointMesh()
 {
-	sl::Mat matDepthMes;
-	zed.retrieveMeasure(matDepthMes, MEASURE::XYZ);
 
 	// make point cloud
 	int w = matDepthMes.getWidth();
 	int h = matDepthMes.getHeight();
-
+	
 	float *data = (float*)(matDepthMes.getPtr<sl::uchar1>(MEM::CPU));
 
 	int step = 4; 
@@ -290,3 +331,62 @@ cv::Mat ofxZedXRL::slMat2cvMat(Mat& input, sl::MEM memType) {
 }
 
 
+ofPixels ofxZedXRL::getImageColor()
+{
+
+	ofImage img;
+
+	ofxCv::toOf(cvMatLeft, img);
+
+	return img.getPixels();
+}
+
+ofPixels ofxZedXRL::getImageCalibRGB()
+{
+	ofPixels pixs; 
+
+	// make point cloud
+	int w = matDepthMesRGB.getWidth();
+	int h = matDepthMesRGB.getHeight();
+
+	pixs.allocate(w, h, OF_PIXELS_RGB);
+
+	float *data = (float*)(matDepthMesRGB.getPtr<float>(MEM::CPU));
+	unsigned char *pixels = new unsigned char[w * h * 3];
+
+	int numChannels = 4;
+	for (int y = 0; y < h; y += 1)
+	{
+		for (int x = 0; x < w; x += 1)
+		{
+			int indx = x * numChannels + y * w*numChannels;		
+			int indxPix = x * 3 + y * 3 * w;
+
+			// decompose 4th float to rgb values
+			float col = data[indx + 3];
+			unsigned char color[sizeof(float)];
+			memcpy(color, &col, sizeof(float));
+			ofColor c ((int)color[0], (int)color[1], (int)color[2]);
+			pixs.setColor(x, y, c);
+		}
+	}
+ 
+	return pixs;
+}
+
+ofVec3f ofxZedXRL::getTranslatedPos(int x, int y)
+{
+	float *data = (float*)(matDepthMes.getPtr<sl::uchar1>(MEM::CPU));
+
+	
+	int numChannels = 3;
+
+	int w = matDepthMes.getWidth();
+	int h = matDepthMes.getHeight();
+	int indx = x * numChannels + y * w*numChannels;
+
+	ofVec3f p( data[indx + 0] * zScale,
+			   data[indx + 1] * zScale,
+			   data[indx + 2] * zScale  );
+	return p;
+}
