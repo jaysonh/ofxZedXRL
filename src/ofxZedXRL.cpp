@@ -208,8 +208,7 @@ void ofxZedXRL::update()
 				}
 			}
 		}
-	}
-	else
+	}else
 	{
 		zedRunning = false;
 	}
