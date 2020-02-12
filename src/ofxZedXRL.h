@@ -50,7 +50,7 @@ public:
 
 	ofVec3f getTranslatedPos(int x, int y);
 	
-	glm::vec3 & getCameraRot();
+	ofVec3f & getCameraRot();
 	glm::vec3 & getCameraPos();
 	glm::vec4 & getCameraOri();
 
@@ -58,7 +58,7 @@ public:
 private:
 	void addPointToMesh(sl::float3 v, ofMesh *m);
 	glm::vec3 cameraPos; 
-	glm::vec3 cameraRot;
+	ofVec3f cameraRot;
 	glm::vec4 cameraOri;
 
 	const float zScale = 100.0;

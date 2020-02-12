@@ -65,7 +65,7 @@ glm::vec4 & ofxZedXRL::getCameraOri()
 	return cameraOri;
 }
 
-glm::vec3 & ofxZedXRL::getCameraRot()
+ofVec3f & ofxZedXRL::getCameraRot()
 {
 	return cameraRot;
 }
@@ -94,24 +94,27 @@ void ofxZedXRL::update()
 									 
 		cv::cvtColor(cvMatLeft,  cvMatLeft,  cv::COLOR_BGR2RGB); // need to shift color to rgb
 		cv::cvtColor(cvMatRight, cvMatRight, cv::COLOR_BGR2RGB);		
+		if (usePosTrack)
+		{
+				sl::Pose zed_pose;
+				zed.getPosition(zed_pose);
+			
+				cameraPos = glm::vec3( zed_pose.getTranslation().tx * zScale, 
+									   zed_pose.getTranslation().ty * zScale, 
+									   zed_pose.getTranslation().tz * zScale  );
+				cameraOri = glm::vec4( zed_pose.getOrientation().ox,
+									   zed_pose.getOrientation().oy,
+									   zed_pose.getOrientation().oz,
+									   zed_pose.getOrientation().ow );
+				cameraRot = glm::vec3( zed_pose.getRotationVector().x,
+									   zed_pose.getRotationVector().y,
+									   zed_pose.getRotationVector().z);
 
+
+		}
 		if(useSpatialMap)
 		{
-			sl::SPATIAL_MAPPING_STATE mapping_state = zed.getSpatialMappingState();
-			
-			sl::Pose zed_pose;
-			zed.getPosition(zed_pose);
-			
-			cameraPos = glm::vec3( zed_pose.getTranslation().tx * zScale, 
-								   zed_pose.getTranslation().ty * zScale, 
-								   zed_pose.getTranslation().tz * zScale  );
-			cameraOri = glm::vec4( zed_pose.getOrientation().ox,
-								   zed_pose.getOrientation().oy,
-								   zed_pose.getOrientation().oz,
-								   zed_pose.getOrientation().ow );
-			cameraRot = glm::vec3( zed_pose.getTranslation().tx,
-								   zed_pose.getTranslation().ty,
-								   zed_pose.getTranslation().tz);
+			sl::SPATIAL_MAPPING_STATE mapping_state = zed.getSpatialMappingState();			
 
 			//zed.extractWholeSpatialMap(spatialMeshsl);
 			float duration = ofGetElapsedTimef() - ts_last;
