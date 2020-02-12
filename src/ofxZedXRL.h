@@ -39,22 +39,34 @@ public:
 
 	float getDepthAt(int x, int y);
 
-	ofMesh * getPointMesh();
-	ofMesh * getPointMeshRGB();
-	ofMesh * getPointMeshRGBIdentify(vector <ofRectangle> rectList);
-	ofMesh * getSpatialMesh();
-	ofMesh * getDetPlane();
+	ofMesh & getPointMesh();
+	ofMesh & getPointMeshRGB();
+	ofMesh & getPointMeshRGBIdentify(vector <ofRectangle> rectList);
+	ofMesh & getSpatialMesh();
+	ofMesh & getDetPlane();
 
 	ofPixels getImageColor();
 	ofPixels getImageCalibRGB();
 
 	ofVec3f getTranslatedPos(int x, int y);
+	
+	glm::vec3 & getCameraRot();
+	glm::vec3 & getCameraPos();
+	glm::vec4 & getCameraOri();
 
+	bool isRunning() { return zedRunning;  }
 private:
+	void addPointToMesh(sl::float3 v, ofMesh *m);
+	glm::vec3 cameraPos; 
+	glm::vec3 cameraRot;
+	glm::vec4 cameraOri;
+
 	const float zScale = 100.0;
 	bool usePosTrack   = false;
 	bool usePlaneDet   = false;
 	bool useSpatialMap = false;
+	sl::Mesh spatialMeshsl;
+	float ts_last = 0.;
 	ofMesh pointMesh;
 	DetPlane detPlane;
 	ofMesh   detPlaneMesh;
@@ -82,5 +94,6 @@ private:
 	
 	ofVec3f trackedPos;
 	ofVec4f trackedOri;
+	bool zedRunning = false;
 
 };

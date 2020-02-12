@@ -36,7 +36,9 @@ void ofxZedXRL::setup( bool _usePosTrack, bool _usePlaneDet, bool _useSpatialMap
 	if (_useSpatialMap)
 	{
 		sl::SpatialMappingParameters mapping_parameters;
-		mapping_parameters.resolution_meter = 0.1;  // Set resolution to 3cm
+		mapping_parameters.resolution_meter = 0.03;  // Set resolution to 3cm
+		mapping_parameters.map_type		    = sl::SpatialMappingParameters::SPATIAL_MAP_TYPE::MESH; // FUSED_POINT_CLOUD or MESH
+		mapping_parameters.save_texture     = true;
 		err = zed.enableSpatialMapping(mapping_parameters);
 
 		useSpatialMap = _useSpatialMap;
@@ -48,11 +50,25 @@ void ofxZedXRL::setup( bool _usePosTrack, bool _usePlaneDet, bool _useSpatialMap
 
 	}
 }
-ofMesh * ofxZedXRL::getDetPlane()
+ofMesh & ofxZedXRL::getDetPlane()
 {
-	return &detPlaneMesh;
+	return detPlaneMesh;
 }
 
+glm::vec3 & ofxZedXRL::getCameraPos()
+{
+	return cameraPos;
+}
+
+glm::vec4 & ofxZedXRL::getCameraOri()
+{
+	return cameraOri;
+}
+
+glm::vec3 & ofxZedXRL::getCameraRot()
+{
+	return cameraRot;
+}
 void ofxZedXRL::update()
 {
 	RuntimeParameters runtime_parameters;
@@ -62,6 +78,7 @@ void ofxZedXRL::update()
 	if (zed.grab(runtime_parameters) == ERROR_CODE::SUCCESS)
 	{
 
+		zedRunning = true;
 		sl::Mat matLeft;
 		sl::Mat matRight;
 		sl::Mat matDepth;
@@ -81,21 +98,51 @@ void ofxZedXRL::update()
 		if(useSpatialMap)
 		{
 			sl::SPATIAL_MAPPING_STATE mapping_state = zed.getSpatialMappingState();
-
-			sl::Mesh mesh;
-
-			zed.extractWholeSpatialMap(mesh);
-			mesh.filter(sl::MeshFilterParameters::MESH_FILTER::LOW);
 			
+			sl::Pose zed_pose;
+			zed.getPosition(zed_pose);
+			
+			cameraPos = glm::vec3( zed_pose.getTranslation().tx * zScale, 
+								   zed_pose.getTranslation().ty * zScale, 
+								   zed_pose.getTranslation().tz * zScale  );
+			cameraOri = glm::vec4( zed_pose.getOrientation().ox,
+								   zed_pose.getOrientation().oy,
+								   zed_pose.getOrientation().oz,
+								   zed_pose.getOrientation().ow );
+			cameraRot = glm::vec3( zed_pose.getTranslation().tx,
+								   zed_pose.getTranslation().ty,
+								   zed_pose.getTranslation().tz);
+
+			//zed.extractWholeSpatialMap(spatialMeshsl);
+			float duration = ofGetElapsedTimef() - ts_last;
+
+			if (duration > 0.5) {
+				zed.requestSpatialMapAsync();
+				ts_last = ofGetElapsedTimef();
+			}
+
+			if (zed.getSpatialMapRequestStatusAsync() == ERROR_CODE::SUCCESS) {
+				zed.retrieveSpatialMapAsync(spatialMeshsl);
+			}
+
+			//mesh.filter(sl::MeshFilterParameters::MESH_FILTER::LOW);
+
 			spatialMesh.clear();
 			spatialMesh.setMode(OF_PRIMITIVE_POINTS);
-						
-			for (auto v : mesh.vertices)
+
+			for (auto v : spatialMeshsl.vertices)
 			{
 				spatialMesh.addVertex(ofVec3f(v.x * zScale, v.y*zScale, v.z*zScale));
 			}
-			
+
+			for (auto id : spatialMeshsl.triangles)
+			{
+				//detPlaneMesh.addIndex(id[0]);
+				//detPlaneMesh.addIndex(id[1]);
+				//detPlaneMesh.addIndex(id[2]);
+			}
 		}
+
 		if (usePosTrack)
 		{
 			sl::Pose zed_pose;
@@ -115,33 +162,67 @@ void ofxZedXRL::update()
 			{ 
 				sl::uint2 coord = sl::uint2( ofMap(ofGetMouseX(), 0, ofGetWidth(), 0, 1280, true),
 											 ofMap(ofGetMouseY(), 0, ofGetHeight(), 0, 720, true));
-
 				 
 				find_plane_status = zed.findPlaneAtHit(coord, plane);
 				
 				if (find_plane_status == ERROR_CODE::SUCCESS) 
 				{
 					sl::Mesh mesh = plane.extractMesh();
+					sl::float3 planeNorm = plane.getNormal();
+					sl::float3 normNorm = planeNorm / planeNorm.norm();
+
 					mesh.filter(sl::MeshFilterParameters::MESH_FILTER::LOW);
-					
-					detPlaneMesh.clear();
-					detPlaneMesh.setMode(OF_PRIMITIVE_POINTS);
-					vector <sl::float3> boundVerts = plane.getBounds();
-
-					for (auto v : boundVerts)
+					//mesh.applyTexture();
+					if (mesh.getNumberOfTriangles() > 0)
 					{
-						ofVec3f p = ofVec3f(v.x *zScale, v.y*zScale, v.z*zScale);
+						detPlaneMesh.clear();
+						//detPlaneMesh.setMode(OF_PRIMITIVE_POINTS);
+						detPlaneMesh.setMode(OF_PRIMITIVE_TRIANGLES);
+						vector <sl::float3> boundVerts = plane.getBounds();
+						
+						for (auto v : mesh.vertices)
+						{
+							addPointToMesh(v, &detPlaneMesh);
+						}
 
-						detPlaneMesh.addVertex(p);
-						detPlaneMesh.addColor(ofColor(0,255,0,125));
+						// Now add verts
+						for (auto id : mesh.triangles)
+						{
+							detPlaneMesh.addIndex(id[0]);
+							detPlaneMesh.addIndex(id[1]);
+							detPlaneMesh.addIndex(id[2]);
+						}
+
+						// Calc uv
+						for (auto v : mesh.vertices)
+						{
+							glm::vec2 uv;
+							uv.x = ofMap(v.x, 0, 10,0, 500);
+							uv.y = ofMap(v.y, 0, 10, 0, 500);
+							detPlaneMesh.addTexCoord(uv);
+						}
 					}
+
+
+					//addPointToMesh(boundVerts.front(), &detPlaneMesh);
 				}
 			}
 		}
 	}
+	else
+	{
+		zedRunning = false;
+	}
 }
 
-ofMesh * ofxZedXRL::getPointMeshRGB()
+void ofxZedXRL::addPointToMesh(sl::float3 v, ofMesh *m)
+{
+	ofVec3f scaledV = ofVec3f(v.x * zScale, v.y * zScale, v.z * zScale);
+	detPlaneMesh.addVertex(scaledV);
+	detPlaneMesh.addColor(ofColor(0, 255, 0, 125));
+}
+
+ofMesh & ofxZedXRL::getPointMeshRGB()
 {
 	// make point cloud
 	int w = matDepthMesRGB.getWidth();
@@ -180,9 +261,9 @@ ofMesh * ofxZedXRL::getPointMeshRGB()
 			pointMesh.addColor(c);
 		}
 	}
-	return &pointMesh;
+	return pointMesh;
 }
-ofMesh * ofxZedXRL::getPointMeshRGBIdentify(vector <ofRectangle> rectList)
+ofMesh & ofxZedXRL::getPointMeshRGBIdentify(vector <ofRectangle> rectList)
 {
 	// make point cloud
 	int w = matDepthMesRGB.getWidth();
@@ -230,9 +311,9 @@ ofMesh * ofxZedXRL::getPointMeshRGBIdentify(vector <ofRectangle> rectList)
 			pointMesh.addColor(  c );
 		}
 	}
-	return &pointMesh;
+	return pointMesh;
 }
-ofMesh * ofxZedXRL::getPointMesh()
+ofMesh & ofxZedXRL::getPointMesh()
 {
 
 	// make point cloud
@@ -272,11 +353,11 @@ ofMesh * ofxZedXRL::getPointMesh()
 		}
 	}
 
-	return &pointMesh;
+	return pointMesh;
 }
-ofMesh *ofxZedXRL::getSpatialMesh()
+ofMesh & ofxZedXRL::getSpatialMesh()
 {
-	return &spatialMesh;
+	return spatialMesh;
 }
 
 void ofxZedXRL::drawDetPlane()
