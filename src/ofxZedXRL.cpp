@@ -99,9 +99,9 @@ void ofxZedXRL::update()
 				sl::Pose zed_pose;
 				zed.getPosition(zed_pose);
 			
-				cameraPos = glm::vec3( zed_pose.getTranslation().tx * zScale, 
-									   zed_pose.getTranslation().ty * zScale, 
-									   zed_pose.getTranslation().tz * zScale  );
+				cameraPos = glm::vec3( zed_pose.getTranslation().tx, 
+									   zed_pose.getTranslation().ty, 
+									   zed_pose.getTranslation().tz );
 				cameraOri = glm::vec4( zed_pose.getOrientation().ox,
 									   zed_pose.getOrientation().oy,
 									   zed_pose.getOrientation().oz,
@@ -135,7 +135,7 @@ void ofxZedXRL::update()
 
 			for (auto v : spatialMeshsl.vertices)
 			{
-				spatialMesh.addVertex(ofVec3f(v.x * zScale, v.y*zScale, v.z*zScale));
+				spatialMesh.addVertex(ofVec3f(v.x, v.y, v.z));
 			}
 
 			for (auto id : spatialMeshsl.triangles)
