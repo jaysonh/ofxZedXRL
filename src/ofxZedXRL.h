@@ -29,7 +29,7 @@ public:
 
 	ofxZedXRL();
 
-	void setup( bool _usePosTrack = false, bool _usePlaneDet = false, bool _useSpatialMap =false);
+	void setup( bool _usePosTrack = false, bool _usePlaneDet = false, bool _useSpatialMap =false, UNIT unit = UNIT::MILLIMETER);
 	void update();
 
 	void drawLeft(int x, int y,  int w = 1280, int h = 720);
@@ -39,29 +39,38 @@ public:
 
 	float getDepthAt(int x, int y);
 
-	ofMesh & getPointMesh();
+	ofMesh & getPointMesh( int meshStep = 4 );
 	ofMesh & getPointMeshRGB();
 	ofMesh & getPointMeshRGBIdentify(vector <ofRectangle> rectList);
 	ofMesh & getSpatialMesh();
 	ofMesh & getDetPlane();
 
 	ofPixels getImageColor();
-	ofPixels getImageCalibRGB();
+	ofPixels getImageCalibRGB(float depthThresh = 0.0);
 
 	ofVec3f getTranslatedPos(int x, int y);
 	
-	ofVec3f & getCameraRot();
+	ofVec3f   & getCameraRot();
 	glm::vec3 & getCameraPos();
 	glm::vec4 & getCameraOri();
 
+	cv::Mat getRGBDMat();
+	cv::Mat getDepthMat();
+
 	bool isRunning() { return zedRunning;  }
+
+	int getMeshHeight();
+	int getMeshWidth();
+
+	glm::vec3 getWorldCoordAt(glm::vec2 pos);
+
 private:
 	void addPointToMesh(sl::float3 v, ofMesh *m);
 	glm::vec3 cameraPos; 
-	ofVec3f cameraRot;
+	ofVec3f   cameraRot;
 	glm::vec4 cameraOri;
 
-	const float zScale = 100.0;
+	const float zScale = 1.0;
 	bool usePosTrack   = false;
 	bool usePlaneDet   = false;
 	bool useSpatialMap = false;

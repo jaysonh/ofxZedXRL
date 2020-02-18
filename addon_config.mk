@@ -35,6 +35,10 @@ common:
 	ADDON_INCLUDES = libs/ofxCv/include
 	ADDON_INCLUDES += libs/CLD/include/CLD
 	ADDON_INCLUDES += src
+	ADDON_INCLUDES += C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v7.5\include
+	ADDON_INCLUDES += C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v7.5
+	ADDON_INCLUDES += C:\Program Files (x86)\ZED SDK\include
+	ADDON_INCLUDES += C:\Program Files (x86)\ZED SDK
 	
 	# any special flag that should be passed to the compiler when using this
 	# addon
