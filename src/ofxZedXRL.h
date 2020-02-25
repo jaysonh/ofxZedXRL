@@ -1,97 +1,90 @@
 #pragma once
 
-#include "ofMain.h"
-#include "ofxCv.h"
 #include <sl/Camera.hpp>
 
-using namespace sl;
+#include "ofMain.h"
+#include "ofxCv.h"
 
-class ofxZedXRL
+#include "ofxZedPosData.h"
+#include "ofxZedPlaneData.h"
+#include "ofxZedSpatialData.h"
+
+namespace ofxZedXRL
 {
-public:
+	using namespace sl;
 
-	struct CameraOptions
+	class ofxZed
 	{
-		bool usePosTrack = false;
-		bool usePlaneDet = false;
-		bool useSpatMap  = false;
+	public:
+
+		struct CameraOptions
+		{
+			bool usePosTrack = false;
+			bool usePlaneDet = false;
+			bool useSpatMap  = false;
+			UNIT unitMeasure = UNIT::MILLIMETER;
+			int width        = 1280;
+			int height       = 720;
+		};
+
+		ofxZed();
+		~ofxZed();
+
+		void setup( CameraOptions options );
+
+		void update();
+
+		void drawLeft(  int x, int y, int w = 1280, int h = 720 );
+		void drawRight( int x, int y, int w = 1280, int h = 720 );
+		void drawDepth( int x, int y, int w = 1280, int h = 720 );
+
+		float     getDepthAt( int x, int y );
+		ofMesh &  getMesh( int meshStep = ofxZed::meshDispRes, bool saveRGB = false );
+		ofPixels  getColPixs();
+		ofPixels  getCalibPixs( float depthThresh = 0.0 );
+		cv::Mat   getRGBDMat();
+		cv::Mat   getDepthMat();
+		glm::vec3 getWorldFromMat(  int x, int y );
+		glm::vec3 getWorldFromMesh( int x, int y );
+
+		// Get the result data from the zed camera
+		ofxZedPosData	  & getPosData()     { return position;   }
+		ofxZedSpatialData & getSpatialData() { return spatDet;    }
+		ofxZedPlaneData   & getPlaneData()   { return planeDet;   }
+		CameraOptions	  & getCamOptions()  { return camOptions; }
+
+		// Mesh weight params
+		static const int meshFullRes = 1;
+		static const int meshDispRes = 4;
+
+	private:
+
+		const int   matChannels = 4;	
+		const float spatMapInt  = 0.5; // time between taking a spatial map
+
+		ofColor getRGBValue( float v );
+		cv::Mat slMat2cvMat( sl::Mat& input, 
+							 sl::MEM memType = sl::MEM::CPU ); // converts between sl mat and opencv mat types
+
+		sl::Camera		  camera;
+		CameraOptions     camOptions;
+		ofxZedPosData	  position;
+		ofxZedSpatialData spatDet;
+		ofxZedPlaneData   planeDet;
+
+		float spatMapStart = 0.0;
+
+		// Keep these available for possible use later
+		ofMesh pointMesh;
+
+		sl::Mat matDepthMesRGB;
+		sl::Mat matDepthMes;
+
+		cv::Mat cvMatLeft;
+		cv::Mat cvMatRight;
+		cv::Mat cvMatDepth;
+		cv::Mat cvMatCloud;
+		cv::Mat cvMatDepthMes;
+		cv::Mat cvPointCloud;
 	};
-
-	ofxZedXRL();
-
-	void setup( bool usePosTrack = false, 
-				bool usePlaneDet = false, 
-				bool useSpatMap  = false, 
-				UNIT unitMesure  = UNIT::MILLIMETER );
-
-	void update();
-
-	void drawLeft(  int x, int y, int w = 1280, int h = 720 );
-	void drawRight( int x, int y, int w = 1280, int h = 720  );
-	void drawDepth( int x, int y, int w = 1280, int h = 720  );
-	void drawDetPlane();
-
-	float getDepthAt(int x, int y);
-
-	ofMesh & getMesh(    int meshStep = 4 );
-	ofMesh & getMeshRGB( int meshStep = 4 );
-	ofMesh & getSpatialMesh();
-	ofMesh & getDetPlane();
-
-	ofPixels getImageColor();
-	ofPixels getImageCalibRGB(float depthThresh = 0.0);
-
-	glm::vec3 getTranslatedPos(int x, int y);
-	
-	glm::vec3 & getCameraRot();
-	glm::vec3 & getCameraPos();
-	glm::vec4 & getCameraOri();
-
-	cv::Mat getRGBDMat();
-	cv::Mat getDepthMat();
-
-	int getMeshHeight();
-	int getMeshWidth();
-
-	glm::vec3 getWorldCoordAt(glm::vec2 pos);
-
-private:
-	ofColor getRGBFromFloat(float v);
-	void addPointToMesh(sl::float3 v);
-	cv::Mat slMat2cvMat(sl::Mat& input, sl::MEM memType = sl::MEM::CPU); // converts between sl mat and opencv mat types
-
-	glm::vec3 cameraPos; 
-	glm::vec3 cameraRot;
-	glm::vec4 cameraOri;
-
-	glm::vec3 trackedPos;
-	glm::vec4 trackedOri;
-
-	bool usePosTrack = false;
-	bool usePlaneDet = false;
-	bool useSpatMap  = false;
-
-	sl::Mesh spatialMeshsl;
-	float ts_last = 0.;
-	ofMesh pointMesh;
-	ofMesh   detPlaneMesh;
-	ofMesh   spatialMesh;
-	vector<ofVec3f> detPlaneBounds;
-
-	
-	sl::Camera zed;
-	int zedWidth, zedHeight;
-
-	sl::Mat matDepthMesRGB;
-	sl::Mat matDepthMes;
-	cv::Mat cvMatLeft;
-	cv::Mat cvMatRight;
-	cv::Mat cvMatDepth;
-	cv::Mat cvMatCloud;
-	cv::Mat cvMatDepthMes;
-	cv::Mat cvPointCloud;
-
-	vector<ofVec3f> pointCloudVerts;
-	
-
-};
+}
