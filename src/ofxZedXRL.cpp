@@ -298,7 +298,7 @@ namespace ofxZedXRL
 	{
 		// decompose 4th float to rgb values
 		unsigned char color[sizeof(float)];
-		memcpy(color, &v, sizeof(float));
+		memcpy( color, &v, sizeof(float) );
 
 		return ofColor( (int)color[0], (int)color[1], (int)color[2] );
 	}
