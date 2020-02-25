@@ -5,59 +5,50 @@
 #include <sl/Camera.hpp>
 
 using namespace sl;
+
 class ofxZedXRL
 {
 public:
 
-	struct DetPlane
+	struct CameraOptions
 	{
-		DetPlane()
-		{
-
-		}
-
-		DetPlane(sl::float3 _normal, sl::float4 _planeEq)
-		{
-			normal  = _normal;
-			planeEq = _planeEq;
-
-		}
-
-		sl::float3 normal;
-		sl::float4 planeEq;
+		bool usePosTrack = false;
+		bool usePlaneDet = false;
+		bool useSpatMap  = false;
 	};
 
 	ofxZedXRL();
 
-	void setup( bool _usePosTrack = false, bool _usePlaneDet = false, bool _useSpatialMap =false, UNIT unit = UNIT::MILLIMETER);
+	void setup( bool usePosTrack = false, 
+				bool usePlaneDet = false, 
+				bool useSpatMap  = false, 
+				UNIT unitMesure  = UNIT::MILLIMETER );
+
 	void update();
 
-	void drawLeft(int x, int y,  int w = 1280, int h = 720);
-	void drawRight(int x, int y, int w = 1280, int h = 720);
-	void drawDepth(int x, int y, int w = 1280, int h = 720);
+	void drawLeft(  int x, int y, int w = 1280, int h = 720 );
+	void drawRight( int x, int y, int w = 1280, int h = 720  );
+	void drawDepth( int x, int y, int w = 1280, int h = 720  );
 	void drawDetPlane();
 
 	float getDepthAt(int x, int y);
 
-	ofMesh & getPointMesh( int meshStep = 4 );
-	ofMesh & getPointMeshRGB();
-	ofMesh & getPointMeshRGBIdentify(vector <ofRectangle> rectList);
+	ofMesh & getMesh(    int meshStep = 4 );
+	ofMesh & getMeshRGB( int meshStep = 4 );
 	ofMesh & getSpatialMesh();
 	ofMesh & getDetPlane();
 
 	ofPixels getImageColor();
 	ofPixels getImageCalibRGB(float depthThresh = 0.0);
 
-	ofVec3f getTranslatedPos(int x, int y);
+	glm::vec3 getTranslatedPos(int x, int y);
 	
-	ofVec3f   & getCameraRot();
+	glm::vec3 & getCameraRot();
 	glm::vec3 & getCameraPos();
 	glm::vec4 & getCameraOri();
 
 	cv::Mat getRGBDMat();
 	cv::Mat getDepthMat();
-
-	bool isRunning() { return zedRunning;  }
 
 	int getMeshHeight();
 	int getMeshWidth();
@@ -65,25 +56,29 @@ public:
 	glm::vec3 getWorldCoordAt(glm::vec2 pos);
 
 private:
-	void addPointToMesh(sl::float3 v, ofMesh *m);
+	ofColor getRGBFromFloat(float v);
+	void addPointToMesh(sl::float3 v);
+	cv::Mat slMat2cvMat(sl::Mat& input, sl::MEM memType = sl::MEM::CPU); // converts between sl mat and opencv mat types
+
 	glm::vec3 cameraPos; 
-	ofVec3f   cameraRot;
+	glm::vec3 cameraRot;
 	glm::vec4 cameraOri;
 
-	const float zScale = 1.0;
-	bool usePosTrack   = false;
-	bool usePlaneDet   = false;
-	bool useSpatialMap = false;
+	glm::vec3 trackedPos;
+	glm::vec4 trackedOri;
+
+	bool usePosTrack = false;
+	bool usePlaneDet = false;
+	bool useSpatMap  = false;
+
 	sl::Mesh spatialMeshsl;
 	float ts_last = 0.;
 	ofMesh pointMesh;
-	DetPlane detPlane;
 	ofMesh   detPlaneMesh;
 	ofMesh   spatialMesh;
 	vector<ofVec3f> detPlaneBounds;
 
-	cv::Mat slMat2cvMat(sl::Mat& input, sl::MEM memType = sl::MEM::CPU); // converts between sl mat and opencv mat types
-
+	
 	sl::Camera zed;
 	int zedWidth, zedHeight;
 
@@ -96,13 +91,7 @@ private:
 	cv::Mat cvMatDepthMes;
 	cv::Mat cvPointCloud;
 
-
-	bool invX = true;
-	bool invY = true;
 	vector<ofVec3f> pointCloudVerts;
 	
-	ofVec3f trackedPos;
-	ofVec4f trackedOri;
-	bool zedRunning = false;
 
 };
