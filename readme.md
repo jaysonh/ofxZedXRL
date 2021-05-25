@@ -1,6 +1,6 @@
 
 # Installation
-openframeworks add for zed camera, works for openframeworks 11 on windwos 10 (64bit), use in release mode to avoid random crashing...
+openframeworks add for zed camera, works for OpenFrameworks 11 on Windows 10 (64bit), use in release mode to avoid random crashing...
 
 Need to add the following paths: 
 
